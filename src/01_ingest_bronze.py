@@ -277,6 +277,7 @@ def validate(spark: SparkSession, output: Path, csv_bytes: int) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Read the bronze CLI: CSV path, output path, driver memory, and master."""
     parser = argparse.ArgumentParser(description="Write the bronze events table.")
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -294,6 +295,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Parse the CSV, write date-partitioned Parquet, and validate the row count."""
     args = parse_args(argv)
     source = args.input.resolve()
     output = args.output.resolve()

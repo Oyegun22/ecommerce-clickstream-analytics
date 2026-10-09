@@ -76,6 +76,7 @@ def check_duckdb() -> None:
 
 
 def main() -> None:
+    """Run the Spark row-count check and the DuckDB version check."""
     logger.info("Python %s", sys.version.split()[0])
     check_spark()
     check_duckdb()

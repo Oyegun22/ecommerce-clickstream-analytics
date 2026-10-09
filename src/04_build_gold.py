@@ -7,7 +7,7 @@ Grain choices, measured on silver before this model was frozen:
 - Brand does not. Thousands of products carry more than one brand, so
   ``fact_events.brand`` is the brand on that event and ``dim_product.brand``
   is only the most common brand.
--  A session can contain more than one ``user_id``. ``sessions.user_id`` is
+- A session can contain more than one ``user_id``. ``sessions.user_id`` is
   the user with the most events in that session. Ties go to the smaller
   ``user_id``. The fact keeps every event's own ``user_id``.
 - A session can cross UTC midnight, so ``sessions`` is not partitioned by date.
@@ -83,6 +83,7 @@ def assert_under_gold(path: Path) -> None:
 
 
 def assert_safe_doc(path: Path) -> None:
+    """Refuse to write the model document under data/."""
     resolved = path.resolve()
     data_root = (PROJECT_ROOT / "data").resolve()
     if resolved == data_root or data_root in resolved.parents:
@@ -128,12 +129,14 @@ def build_spark(driver_memory: str, master: str) -> SparkSession:
 
 
 def _as_int(value: object) -> int:
+    """Cast a Spark aggregate to int."""
     if value is None:
         return 0
     return int(value)
 
 
 def _as_float(value: object) -> float:
+    """Cast a Spark aggregate to float."""
     if value is None:
         return 0.0
     return float(value)
@@ -365,6 +368,7 @@ def write_fact(frame: DataFrame, path: Path) -> None:
 
 
 def directory_bytes(path: Path) -> int:
+    """Sum the file sizes under a gold table directory."""
     if not path.exists():
         return 0
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
@@ -540,6 +544,7 @@ def validate(spark: SparkSession, gold: Path) -> dict:
 
 
 def fmt_int(value: int) -> str:
+    """Format an integer with thousands separators."""
     return f"{int(value):,}"
 
 
@@ -834,6 +839,7 @@ def run_self_test(spark: SparkSession) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Read the gold CLI, including the self-test flag."""
     parser = argparse.ArgumentParser(description="Build the gold star schema.")
     parser.add_argument("--silver", type=Path, default=DEFAULT_SILVER)
     parser.add_argument("--gold", type=Path, default=DEFAULT_GOLD)
@@ -848,6 +854,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Build the gold tables and overwrite docs/data_model.md."""
     args = parse_args(argv)
     gold = args.gold.resolve()
     doc_path = args.doc.resolve()

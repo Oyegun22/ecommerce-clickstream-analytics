@@ -78,6 +78,7 @@ logger = logging.getLogger("export_dashboard")
 
 
 def assert_safe_output(path: Path) -> None:
+    """Require the output directory to be dashboard/data, outside data/raw."""
     resolved = path.resolve()
     raw = RAW_ROOT.resolve()
     data_root = DATA_ROOT.resolve()
@@ -94,6 +95,7 @@ def assert_safe_output(path: Path) -> None:
 
 
 def load_analysis():
+    """Load the analysis SQL prelude and the buyer RFM builder."""
     spec = importlib.util.spec_from_file_location("run_analysis", ANALYSIS_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -101,6 +103,7 @@ def load_analysis():
 
 
 def connect() -> duckdb.DuckDBPyConnection:
+    """Open DuckDB with the working directory set to the project root."""
     os.chdir(PROJECT_ROOT)
     connection = duckdb.connect()
     connection.execute("SET TimeZone = 'UTC'")
@@ -111,10 +114,12 @@ def connect() -> duckdb.DuckDBPyConnection:
 
 
 def fetch(connection: duckdb.DuckDBPyConnection, sql: str) -> pd.DataFrame:
+    """Run a SQL string and return a DataFrame."""
     return connection.execute(sql).fetchdf()
 
 
 def prepare_connection(connection: duckdb.DuckDBPyConnection, analysis) -> None:
+    """Set the UTC session and install the analysis macros and views."""
     sql_text = SQL_PATH.read_text()
     prelude, queries = analysis.parse_script(sql_text)
     for statement in analysis.statements(prelude):
@@ -134,6 +139,7 @@ def prepare_connection(connection: duckdb.DuckDBPyConnection, analysis) -> None:
 
 
 def build_frames(connection: duckdb.DuckDBPyConnection) -> dict[str, pd.DataFrame]:
+    """Build the eleven dashboard extracts from gold."""
     daily_category = fetch(
         connection,
         """
@@ -510,17 +516,20 @@ def build_frames(connection: duckdb.DuckDBPyConnection) -> dict[str, pd.DataFram
 
 
 def require(condition: bool, message: str) -> None:
+    """Stop the export when a validation check fails."""
     if not condition:
         logger.error("Check failed: %s", message)
         sys.exit(1)
 
 
 def close(value: float, expected: float, label: str) -> None:
+    """Stop the export when a money figure is outside tolerance."""
     gap = abs(float(value) - expected)
     require(gap <= REVENUE_TOLERANCE, f"{label} {value} expected {expected} gap {gap}")
 
 
 def validate(frames: dict[str, pd.DataFrame], connection: duckdb.DuckDBPyConnection) -> None:
+    """Check the extracts against the published gold figures."""
     totals = frames["month_totals"].iloc[0]
     close(totals["revenue"], EXPECTED_REVENUE, "month revenue")
     require(int(totals["purchases"]) == EXPECTED_PURCHASES, "purchases")
@@ -587,6 +596,7 @@ def validate(frames: dict[str, pd.DataFrame], connection: duckdb.DuckDBPyConnect
 
 
 def write_frames(frames: dict[str, pd.DataFrame], output: Path) -> int:
+    """Overwrite the Parquet extracts and return their total size in bytes."""
     output.mkdir(parents=True, exist_ok=True)
     for stale in output.glob("*.parquet"):
         stale.unlink()
@@ -602,12 +612,14 @@ def write_frames(frames: dict[str, pd.DataFrame], output: Path) -> int:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Read the export CLI output directory."""
     parser = argparse.ArgumentParser(description="Export dashboard aggregates from gold.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Build, validate, and write the dashboard extracts."""
     args = parse_args(argv)
     output = args.output.resolve()
     assert_safe_output(output)

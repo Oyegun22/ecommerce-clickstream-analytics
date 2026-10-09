@@ -1,7 +1,7 @@
 # Silver cleaning log
 
 Source: `data/bronze/events`. Output: `data/silver/events`, partitioned by `event_date`.
-Run: 2026-10-09 12:42:02 UTC on Spark 3.5.3. Elapsed 97.7 seconds.
+Run: 2026-10-09 20:31:52 UTC on Spark 3.5.3. Elapsed 93.3 seconds.
 Removed is rows deleted by the rule. Affected is rows the rule rewrote or flagged.
 For the two drop rules, affected equals removed. Counts are from this run.
 

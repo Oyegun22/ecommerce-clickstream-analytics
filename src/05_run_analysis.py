@@ -47,6 +47,7 @@ logger = logging.getLogger("run_analysis")
 
 
 def assert_safe_output(path: Path) -> None:
+    """Refuse to write the analysis report under data/."""
     resolved = path.resolve()
     data_root = DATA_ROOT.resolve()
     if resolved == data_root or data_root in resolved.parents:
@@ -91,6 +92,7 @@ def parse_script(sql: str) -> tuple[str, list[tuple[str, str, str]]]:
 
 
 def connect() -> duckdb.DuckDBPyConnection:
+    """Open an in-memory DuckDB connection."""
     os.chdir(PROJECT_ROOT)
     connection = duckdb.connect()
     connection.execute("SET TimeZone = 'UTC'")
@@ -98,6 +100,7 @@ def connect() -> duckdb.DuckDBPyConnection:
 
 
 def execute(connection: duckdb.DuckDBPyConnection, sql: str) -> pd.DataFrame | None:
+    """Run one statement and return a DataFrame when it yields rows."""
     connection.execute(sql)
     if connection.description is None:
         return None
@@ -185,6 +188,7 @@ def run_self_test(sql_text: str) -> None:
 
 
 def _scalar(value: object) -> object:
+    """Unwrap a one-cell result."""
     if value is None:
         return None
     item = getattr(value, "item", None)
@@ -197,6 +201,7 @@ def _scalar(value: object) -> object:
 
 
 def _missing(value: object) -> bool:
+    """Return true when a result cell is null."""
     if value is None:
         return True
     try:
@@ -207,6 +212,7 @@ def _missing(value: object) -> bool:
 
 
 def format_value(column: str, value: object) -> str:
+    """Format a result cell as money, a rate, or a count."""
     value = _scalar(value)
     if _missing(value):
         return ""
@@ -237,6 +243,7 @@ def format_value(column: str, value: object) -> str:
 
 
 def to_markdown(frame: pd.DataFrame) -> str:
+    """Render a result frame as a Markdown table."""
     columns = [str(column) for column in frame.columns]
     header = "| " + " | ".join(columns) + " |"
     separator = "| " + " | ".join("---" for _ in columns) + " |"
@@ -248,14 +255,17 @@ def to_markdown(frame: pd.DataFrame) -> str:
 
 
 def as_float(value: object) -> float:
+    """Coerce a result cell to float."""
     return float(_scalar(value))
 
 
 def as_int(value: object) -> int:
+    """Coerce a result cell to int."""
     return int(_scalar(value))
 
 
 def stage_sessions(frame: pd.DataFrame, stage: str) -> int:
+    """Read one session-funnel stage count from a result frame."""
     hit = frame.loc[frame["stage"] == stage, "sessions"]
     if len(hit) != 1:
         logger.error("Funnel stage %s not found once", stage)
@@ -264,6 +274,7 @@ def stage_sessions(frame: pd.DataFrame, stage: str) -> int:
 
 
 def require(condition: bool, message: str) -> None:
+    """Stop the run when a validation check fails."""
     if not condition:
         logger.error("Check failed: %s", message)
         sys.exit(1)
@@ -343,6 +354,7 @@ def render_results(
     min_epoch: int,
     elapsed: float,
 ) -> str:
+    """Write the Markdown report from the named query results."""
     generated = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     lines = [
         "# Analysis results",
@@ -371,6 +383,7 @@ def render_results(
 
 
 def run_queries(sql_path: Path, output_path: Path) -> None:
+    """Run the prelude and named queries, then validate and write the report."""
     sql_text = sql_path.read_text()
     run_self_test(sql_text)
     prelude, queries = parse_script(sql_text)
@@ -418,6 +431,7 @@ def run_queries(sql_path: Path, output_path: Path) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Read the analysis CLI, including the self-test flag."""
     parser = argparse.ArgumentParser(description="Run the gold-layer analysis queries.")
     parser.add_argument("--sql", type=Path, default=DEFAULT_SQL)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -426,6 +440,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Run the macro self-test or the full gold analysis."""
     args = parse_args(argv)
     sql_path = args.sql.resolve()
     output_path = args.output.resolve()

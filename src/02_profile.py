@@ -134,12 +134,14 @@ def load_events(spark: SparkSession, bronze: Path) -> DataFrame:
 
 
 def _as_int(value: object) -> int:
+    """Cast a Spark aggregate to int."""
     if value is None:
         return 0
     return int(value)
 
 
 def _as_float(value: object) -> float:
+    """Cast a Spark aggregate to float."""
     return float(value)
 
 
@@ -362,6 +364,7 @@ def _distribution(frame: DataFrame, value_column: str) -> dict:
 
 
 def _buckets(frame: DataFrame, value_column: str, labels: tuple[str, ...], bucket_expr) -> list[dict]:
+    """Count rows into the requested labels."""
     rows = (
         frame.groupBy(bucket_expr.alias("bucket"))
         .agg(F.count(F.lit(1)).alias("n"))
@@ -385,6 +388,7 @@ def session_bucket(column):
 
 
 def event_bucket(column):
+    """Map an event count to a fixed bucket."""
     return (
         F.when(column == 1, "1")
         .when(column.between(2, 5), "2-5")
@@ -450,6 +454,7 @@ def session_and_user_stats(events: DataFrame) -> dict:
 
 
 def fmt_int(value: int) -> str:
+    """Format an integer with thousands separators."""
     return f"{int(value):,}"
 
 
@@ -484,6 +489,7 @@ def fmt_count_stat(value: float) -> str:
 
 
 def _sentence(*parts: str) -> str:
+    """Join interpretation fragments into one sentence."""
     text = " ".join(part.strip() for part in parts if part.strip())
     if not text.endswith("."):
         text += "."
@@ -491,6 +497,7 @@ def _sentence(*parts: str) -> str:
 
 
 def interpret_population(metrics: dict) -> str:
+    """Describe the profiled row, user, session, and product counts."""
     cards = metrics["cardinality"]
     users = metrics["sessions"]["user_dist"]["n"]
     sessions = metrics["sessions"]["event_dist"]["n"]
@@ -502,6 +509,7 @@ def interpret_population(metrics: dict) -> str:
 
 
 def interpret_events(metrics: dict) -> str:
+    """Describe the view, cart, and purchase mix."""
     rows = metrics["rows"]
     other = (
         "no other event_type is present"
@@ -516,6 +524,7 @@ def interpret_events(metrics: dict) -> str:
 
 
 def interpret_nulls(metrics: dict) -> str:
+    """Describe which columns are null and how often."""
     nulls = metrics["nulls"]
     present = [(name, count) for name, count in nulls.items() if count]
     if not present:
@@ -529,6 +538,7 @@ def interpret_nulls(metrics: dict) -> str:
 
 
 def interpret_price(metrics: dict) -> str:
+    """Describe the price distribution, including the zero prices."""
     skew = (
         "right-skewed"
         if metrics["price_mean"] > metrics["price_median"]
@@ -577,6 +587,7 @@ def non_positive_prices(events: DataFrame) -> list[dict]:
 
 
 def interpret_non_positive(metrics: dict) -> str:
+    """Describe where the non-positive prices sit by event type."""
     total = sum(row["rows"] for row in metrics["price_by_type"])
     listed = ", ".join(
         f"{row['event_type']} {fmt_int(row['rows'])}" for row in metrics["price_by_type"]
@@ -587,6 +598,7 @@ def interpret_non_positive(metrics: dict) -> str:
 
 
 def interpret_duplicates(metrics: dict) -> str:
+    """Describe the exact-duplicate groups and the extra rows they add."""
     extra = metrics["duplicates"]["extra_rows"]
     groups = metrics["duplicates"]["duplicate_groups"]
     return _sentence(
@@ -597,6 +609,7 @@ def interpret_duplicates(metrics: dict) -> str:
 
 
 def interpret_categories(metrics: dict) -> str:
+    """Describe category depth, including the four-part piano code."""
     rows = [row for row in metrics["categories"] if row["depth"] != "missing"]
     if not rows:
         return "Every category_code is null."
@@ -609,6 +622,7 @@ def interpret_categories(metrics: dict) -> str:
 
 
 def interpret_brands(metrics: dict) -> str:
+    """Describe brand cardinality and the null brand rate."""
     raw = metrics["cardinality"]["brands"]
     normalised = metrics["cardinality"]["brands_normalised"]
     changed = metrics["brand_needs_normalising"]
@@ -624,6 +638,7 @@ def interpret_brands(metrics: dict) -> str:
 
 
 def interpret_users(metrics: dict) -> str:
+    """Describe how sessions are spread across users."""
     dist = metrics["sessions"]["user_dist"]
     single = next(bucket for bucket in metrics["sessions"]["user_buckets"] if bucket["bucket"] == "1")
     return _sentence(
@@ -634,6 +649,7 @@ def interpret_users(metrics: dict) -> str:
 
 
 def interpret_session_length(metrics: dict) -> str:
+    """Describe how events are spread across sessions."""
     dist = metrics["sessions"]["event_dist"]
     multi = metrics["sessions"]["sessions_multi_user"]
     return _sentence(
@@ -644,6 +660,7 @@ def interpret_session_length(metrics: dict) -> str:
 
 
 def interpret_purchase_sessions(metrics: dict) -> str:
+    """Describe how many sessions contain a purchase."""
     sessions = metrics["sessions"]["event_dist"]["n"]
     with_purchase = metrics["sessions"]["sessions_with_purchase"]
     return _sentence(
@@ -887,6 +904,7 @@ def render_markdown(metrics: dict) -> str:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Read the profile CLI: bronze path, markdown path, memory, and master."""
     parser = argparse.ArgumentParser(description="Profile the bronze events table.")
     parser.add_argument("--bronze", type=Path, default=DEFAULT_BRONZE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -943,6 +961,7 @@ def _check_session_accounting(metrics: dict) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Profile bronze and overwrite docs/data_profile.md."""
     args = parse_args(argv)
     bronze = args.bronze.resolve()
     output = args.output.resolve()

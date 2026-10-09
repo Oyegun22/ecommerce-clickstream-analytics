@@ -442,3 +442,49 @@ The smoke script is a local check, not a project file. It calls the filter funct
 1. **`data/` in `.gitignore` ignored `dashboard/data`.** `git check-ignore -v` pointed at that rule for a file under `dashboard/data`. The rule is now `/data/`. A later check ignores `data/gold` and does not ignore `dashboard/data/month_totals.parquet`.
 2. **No browser was available in this session.** Widget behavior was checked with `AppTest`: page changes, the electronics category, 2019-10-16, a three-day range, and the event-type filter. The headless server booted and answered on port 8765. The first HTML response is the Streamlit shell, so the KPI text is not in that response. A real browser pass of the rendered page was not run.
 3. **Streamlit suggested installing Watchdog.** The server still started and the health check passed. Watchdog is not required to run the app.
+
+## Phase 8 — Documentation and polish (2026-10-09)
+
+### What was done
+
+- Wrote `README.md`, `Makefile`, `docs/project_brief.md`, and an MIT `LICENSE`.
+- Added one-line docstrings to the pipeline and dashboard functions that lacked them. Removed an unused revenue total in `dashboard/metrics.py` that the share calculation did not read. Paths were already rooted at the project directory. No machine-specific paths were found.
+- Ran `make all` from setup through the dashboard export. Each step logged success. The raw CSV size was still 5,668,612,855 bytes.
+
+### Commands
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+make all
+```
+
+`make all` installs the root requirements, then runs `src/00_check_env.py` through `src/06_export_dashboard_data.py` in order.
+
+### Key numbers
+
+| Step | Result |
+| --- | --- |
+| Environment check | `Environment check passed` |
+| Bronze | `BRONZE_ELAPSED seconds=21.4`, `Bronze ingest passed` |
+| Profile | `PROFILE_ELAPSED seconds=44.0`, `Bronze profile passed` |
+| Silver | `SILVER_ELAPSED seconds=93.6`, rows out 42,418,542, duplicates removed 30,220, null keys removed 2 |
+| Gold | `GOLD_VALIDATED fact_rows=42418542 sessions=9244421 users=3022290 products=166794`, `GOLD_ELAPSED seconds=74.7` |
+| Analysis | `ANALYSIS_VALIDATED revenue=229,933,212.63 purchases=742,773 buyers=347,118`, `ANALYSIS_ELAPSED seconds=10.5` |
+| Dashboard export | `DASHBOARD_VALIDATED revenue=229933212.63 purchases=742773 users=3022290`, `DASHBOARD_BYTES 354128`, `EXPORT_ELAPSED seconds=7.2` |
+| Folder sizes after the run | bronze 737,707,885; silver 1,478,063,662; gold 1,752,720,372 |
+| Brand rollup after the new extracts | All-category brand revenue 229,933,212.63; apple 111,199,495.70 |
+
+The regenerated docs changed their run stamps and elapsed times. The analysis result cells are the same tables as the previous run. Query timings in `docs/analysis_results.md` moved by about a tenth of a second. The cleaning log stamps 93.3 seconds and the model doc stamps 74.3 seconds because each file is written before `spark.stop()`.
+
+### Decisions
+
+- `make clean` is the silver cleaning script. The target list is `setup`, `ingest`, `profile`, `clean`, `gold`, `analyze`, `dashboard`, and `all`.
+- `make dashboard` writes the extracts and returns. Launching Streamlit stays a separate command so `make all` can finish.
+- The README dashboard link and the three screenshot paths are placeholders for the deploy step.
+- The license copyright uses the local author name `Apple`, the same name as the commits in this workspace.
+
+### Problems
+
+1. **Profile and silver again logged `RowBasedKeyValueBatch.spill()` returning 0.** The same warning appeared in the earlier profile and silver runs. Both steps still logged their expected row counts, and gold validation passed.
+2. **The export rewrote the Parquet extracts at 354,128 bytes.** The previous export was 353,617 bytes. Revenue, purchases, users, and the apple brand total match the published figures. The size change is the Parquet writer, and the new files replace the previous extracts.

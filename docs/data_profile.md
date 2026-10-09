@@ -1,6 +1,6 @@
 # Bronze data profile
 
-Source: `data/bronze/events`, profiled 2026-10-09 12:28:13 UTC by `src/02_profile.py` on Spark 3.5.3. Median and p99 are Spark SQL `percentile` (exact, with interpolation). Session stats exclude null `user_session` values. User stats exclude null `user_id` values.
+Source: `data/bronze/events`, profiled 2026-10-09 20:30:19 UTC by `src/02_profile.py` on Spark 3.5.3. Median and p99 are Spark SQL `percentile` (exact, with interpolation). Session stats exclude null `user_session` values. User stats exclude null `user_id` values.
 
 ## Population
 

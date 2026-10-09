@@ -34,6 +34,7 @@ DAY_ORDER = (
 
 
 def load_all(data_dir: Path) -> dict[str, pd.DataFrame]:
+    """Read every Parquet extract and store event_date as a date."""
     tables = {}
     for path in sorted(data_dir.glob("*.parquet")):
         frame = pd.read_parquet(path)
@@ -44,16 +45,19 @@ def load_all(data_dir: Path) -> dict[str, pd.DataFrame]:
 
 
 def bounds(tables: dict[str, pd.DataFrame]) -> tuple[date, date]:
+    """Return the first and last event dates in the daily totals."""
     values = tables["daily_totals"]["event_date"]
     return min(values), max(values)
 
 
 def in_range(frame: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
+    """Copy rows whose event_date falls inside the inclusive range."""
     dates = frame["event_date"]
     return frame.loc[(dates >= start) & (dates <= end)].copy()
 
 
 def is_full_month(start: date, end: date, first: date, last: date) -> bool:
+    """Return true when the range covers the first through the last date."""
     return start == first and end == last
 
 
@@ -72,6 +76,7 @@ def overview_daily(
 
 
 def kpis(daily: pd.DataFrame) -> dict[str, float]:
+    """Sum views, carts, purchases, and revenue, then recompute conversion and AOV."""
     views = float(daily["views"].sum())
     carts = float(daily["carts"].sum())
     purchases = float(daily["purchases"].sum())
@@ -116,6 +121,7 @@ def active_users(
 
 
 def category_revenue(tables: dict[str, pd.DataFrame], start: date, end: date) -> pd.DataFrame:
+    """Sum top-level category metrics over the selected dates."""
     frame = in_range(tables["daily_category"], start, end)
     grouped = (
         frame.groupby("category_l1", as_index=False)[["views", "carts", "purchases", "revenue"]]
@@ -130,6 +136,7 @@ def category_revenue(tables: dict[str, pd.DataFrame], start: date, end: date) ->
 def level2_revenue(
     tables: dict[str, pd.DataFrame], start: date, end: date, category: str, limit: int = 10
 ) -> pd.DataFrame:
+    """Return the top second-level categories and each share of the selection."""
     frame = in_range(tables["category_l2"], start, end)
     if category != "All":
         frame = frame.loc[frame["category_l1"] == category]
@@ -138,9 +145,6 @@ def level2_revenue(
     ].sum()
     grouped["category"] = grouped["category_l1"] + " / " + grouped["category_l2"]
     grouped = grouped.sort_values("revenue", ascending=False).head(limit)
-    total = float(in_range(tables["daily_totals"] if category == "All" else tables["daily_category"].loc[
-        tables["daily_category"]["category_l1"] == category
-    ], start, end)["revenue"].sum()) if category == "All" or category else 0.0
     # Share of the selected scope, computed from that scope's own revenue.
     scope = overview_daily(tables, start, end, category)
     scope_revenue = float(scope["revenue"].sum())
@@ -149,6 +153,7 @@ def level2_revenue(
 
 
 def brand_revenue(tables: dict[str, pd.DataFrame], start: date, end: date, category: str) -> pd.DataFrame:
+    """Sum one category rollup, or the pre-aggregated All rollup."""
     frame = tables["brands"]
     frame = frame.loc[frame["category_l1"] == category]
     frame = in_range(frame, start, end)
@@ -167,6 +172,7 @@ def brand_revenue(tables: dict[str, pd.DataFrame], start: date, end: date, categ
 def price_band_revenue(
     tables: dict[str, pd.DataFrame], start: date, end: date, category: str
 ) -> pd.DataFrame:
+    """Sum purchase revenue by band and omit the non-positive band."""
     frame = in_range(tables["price_bands"], start, end)
     if category != "All":
         frame = frame.loc[frame["category_l1"] == category]
@@ -188,6 +194,7 @@ def price_band_revenue(
 def abandonment(
     tables: dict[str, pd.DataFrame], start: date, end: date, category: str
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, float]]:
+    """Sum cart pairs, abandoned pairs, and abandoned cart value."""
     frame = in_range(tables["abandonment"], start, end)
     if category != "All":
         scoped = frame.loc[frame["category_l1"] == category]
@@ -242,6 +249,7 @@ def heatmap(
 
 
 def rfm_table(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Add buyer share and revenue share to the full-month RFM segments."""
     frame = tables["rfm_segments"].copy()
     buyers = frame["buyers"].sum()
     revenue = frame["revenue"].sum()

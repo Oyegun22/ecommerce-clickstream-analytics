@@ -1,6 +1,6 @@
 # Gold data model
 
-Star schema built from `data/silver/events`. Run 2026-10-09 14:11:56 UTC on Spark 3.5.3. Elapsed 73.0 seconds.
+Star schema built from `data/silver/events`. Run 2026-10-09 20:33:07 UTC on Spark 3.5.3. Elapsed 74.3 seconds.
 
 Category is a property of `product_id` on this file, so it lives only on `dim_product`. Brand is not. `fact_events.brand` is the brand recorded on the event. `dim_product.brand` is the most common brand for that product, with the smaller brand string winning a tie.
 

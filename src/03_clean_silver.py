@@ -88,6 +88,7 @@ logger = logging.getLogger("clean_silver")
 
 @dataclass
 class RuleLog:
+    """One cleaning step: rows in, rows out, and the reason for the rule."""
     step: int
     name: str
     rows_in: int
@@ -258,12 +259,14 @@ def apply_repairs(events: DataFrame) -> DataFrame:
 
 
 def _as_int(value: object) -> int:
+    """Cast a Spark aggregate to int."""
     if value is None:
         return 0
     return int(value)
 
 
 def count_rows(events: DataFrame) -> int:
+    """Return the number of rows in a DataFrame."""
     return _as_int(events.count())
 
 
@@ -276,6 +279,7 @@ def count_brand_dirty(events: DataFrame) -> int:
 
 
 def count_null_user_keys(events: DataFrame) -> int:
+    """Count events with a null user or a null or blank session."""
     return count_rows(events.filter(null_user_key()))
 
 
@@ -343,6 +347,7 @@ def write_silver(events: DataFrame, output: Path) -> None:
 
 
 def directory_bytes(path: Path) -> int:
+    """Sum the file sizes under a directory."""
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
@@ -482,6 +487,7 @@ def duplicate_extra_rows(spark: SparkSession) -> int:
 
 
 def fmt_int(value: int) -> str:
+    """Format an integer with thousands separators."""
     return f"{int(value):,}"
 
 
@@ -804,6 +810,7 @@ def run_self_test(spark: SparkSession) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Read the silver CLI, including the self-test flag."""
     parser = argparse.ArgumentParser(description="Clean bronze events into silver.")
     parser.add_argument("--bronze", type=Path, default=DEFAULT_BRONZE)
     parser.add_argument("--output", type=Path, default=DEFAULT_SILVER)
@@ -822,6 +829,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Clean bronze into silver, or run the rule self-test and exit."""
     args = parse_args(argv)
     output = args.output.resolve()
     log_path = args.log.resolve()

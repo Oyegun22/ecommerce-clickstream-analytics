@@ -74,6 +74,7 @@ def coerce_range(value: object, first: date, last: date) -> tuple[date, date]:
 
 
 def missing(value: object) -> bool:
+    """Return true when a metric value is absent."""
     if value is None:
         return True
     try:
@@ -83,18 +84,21 @@ def missing(value: object) -> bool:
 
 
 def fmt_money(value: object) -> str:
+    """Format a money amount to cents, or an em dash when it is missing."""
     if missing(value):
         return "—"
     return f"{float(value):,.2f}"
 
 
 def fmt_count(value: object) -> str:
+    """Format a count with thousands separators."""
     if missing(value):
         return "—"
     return f"{int(round(float(value))):,}"
 
 
 def fmt_users(value: object, exact: bool) -> str:
+    """Format an exact user count, or one decimal place for a daily average."""
     if missing(value):
         return "—"
     number = float(value)
@@ -104,6 +108,7 @@ def fmt_users(value: object, exact: bool) -> str:
 
 
 def fmt_rate(value: object) -> str:
+    """Format a rate in the range 0 to 1 as a percent."""
     if missing(value):
         return "—"
     return f"{float(value) * 100:.2f}%"
@@ -117,6 +122,7 @@ def fmt_rate_detail(value: object) -> str:
 
 
 def apply_layout(fig: go.Figure, title: str, *, height: int = 420) -> go.Figure:
+    """Apply the shared Plotly template, font, and margins."""
     fig.update_layout(
         template="plotly_white",
         font={"family": "Arial", "size": 13},
@@ -130,10 +136,12 @@ def apply_layout(fig: go.Figure, title: str, *, height: int = 420) -> go.Figure:
 
 def show_chart(fig: go.Figure, alt: str) -> None:
     # theme=None keeps the notebook palette. The Streamlit theme would replace it.
+    """Draw a Plotly figure and keep its own colors."""
     st.plotly_chart(fig, theme=None, alt=alt)
 
 
 def bar_colors(names: pd.Series, known: str) -> list[str]:
+    """Use orange for unknown, gray for the other bucket, and the given color otherwise."""
     colors = []
     for name in names:
         if name == "unknown":
@@ -154,6 +162,7 @@ def horizontal_bars(
     known_color: str,
     alt: str,
 ) -> None:
+    """Draw horizontal bars with the largest value at the top."""
     plot = frame.sort_values(value_column, ascending=True)
     fig = go.Figure(
         go.Bar(
@@ -170,6 +179,7 @@ def horizontal_bars(
 
 
 def category_options(tables: dict[str, pd.DataFrame]) -> list[str]:
+    """List All, then categories ordered by full-month revenue."""
     ranked = tables["month_category"].sort_values(
         ["revenue", "category_l1"], ascending=[False, True]
     )
@@ -177,6 +187,7 @@ def category_options(tables: dict[str, pd.DataFrame]) -> list[str]:
 
 
 def sidebar(tables: dict[str, pd.DataFrame], first: date, last: date) -> tuple[str, date, date, str, str]:
+    """Draw the page, date range, category, and event-type controls."""
     with st.sidebar:
         st.header("Filters")
         page = st.radio("Page", PAGES, key="page")
@@ -206,6 +217,7 @@ def render_overview(
     category: str,
     event_type: str,
 ) -> None:
+    """Draw the KPI cards, the event funnel, and daily revenue."""
     daily = metrics.overview_daily(tables, start, end, category)
     cards = metrics.kpis(daily)
     user_label, user_value, user_exact = metrics.active_users(tables, daily, start, end, category)
@@ -402,6 +414,7 @@ def render_products(
     end: date,
     category: str,
 ) -> None:
+    """Draw category, brand, price-band, and abandonment views."""
     scoped = metrics.kpis(metrics.overview_daily(tables, start, end, category))
     st.caption(f"Revenue in this selection is {fmt_money(scoped['revenue'])}.")
 
@@ -564,6 +577,7 @@ def render_customers(
     category: str,
     event_type: str,
 ) -> None:
+    """Draw the full-month RFM segments and the UTC heatmap."""
     st.subheader("RFM segments")
     segments = metrics.rfm_table(tables)
     buyers = float(segments["buyers"].sum())
@@ -689,6 +703,7 @@ def render_customers(
 
 
 def main() -> None:
+    """Load the extracts and draw the page selected in the sidebar."""
     st.set_page_config(
         page_title="October 2019 clickstream",
         page_icon=":material/monitoring:",
