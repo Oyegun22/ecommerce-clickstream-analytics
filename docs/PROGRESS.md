@@ -327,3 +327,59 @@ Views, carts, and purchases sum to 42,418,542. Fact revenue and the sum of `sess
 2. **The bronze purchase count was 742,849.** Gold purchases are 742,773. By event type, the Phase 4 row drops are 76 purchases, 28,075 carts, and 2,071 views. Those three drops sum to 30,222, which is the 30,220 duplicate extras plus the 2 null-session rows. The purchase grain is the surviving silver purchase.
 3. **3,271,152 sessions have duration 0, and the longest session lasts 2,640,529 seconds (30.56 days).** A single instant is duration 0. A session may span the month. Both were left as measured.
 4. **No spill warning on this run.** The hostname and missing native-Hadoop messages are the same local-mode warnings as earlier phases. Validation counts matched, so they were left as-is.
+
+## Phase 6 — Analysis (2026-10-09)
+
+### What was done
+
+- Wrote `sql/analysis.sql` and `src/05_run_analysis.py`. DuckDB reads the gold Parquet, with the session time zone set to UTC, and overwrites `docs/analysis_results.md` after the checks pass.
+- The script's self-test pins the price bands, the RFM segment priority, and the direction of the recency NTILE.
+- Wrote `notebooks/eda.ipynb` with 12 Plotly charts and a short reading under each chart. Executed the notebook in place. It finished with 12 chart outputs and no cell errors.
+- Wrote `docs/key_findings.md` from the result tables.
+
+### Commands
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+source .venv/bin/activate
+python src/05_run_analysis.py --self-test
+python src/05_run_analysis.py
+jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb --ExecutePreprocessor.timeout=300
+```
+
+DuckDB is v1.5.6. The successful analysis run logged `ANALYSIS_ELAPSED seconds=9.9`. The earliest event epoch is 1569888000, which is 2019-10-01 00:00:00 UTC.
+
+### Key numbers
+
+| Check | Result |
+| --- | --- |
+| Revenue | 229,933,212.63 |
+| Purchases / average order value | 742,773 / 309.56 |
+| Buyers / buyer rate | 347,118 / 0.114853 |
+| View, then view-and-cart, then view-cart-purchase sessions | 9,242,653 / 571,907 / 291,500 |
+| Purchase sessions with no cart | 337,699 (rate 0.536405) |
+| electronics revenue share | 0.767378 (176,445,577.86) |
+| electronics / smartphone revenue share | 0.682954 (157,033,913.97) |
+| Apple / Samsung revenue | 111,199,495.70 / 46,402,037.35 |
+| Unknown category revenue | 22,922,165.08 (share 0.099691) |
+| Cart pairs abandoned | 323,267 of 628,207 (rate 0.514587) |
+| Abandoned cart value | 107,866,053.25 |
+| Buyers with two or more purchase sessions | 111,657 buyers, revenue 159,793,398.94 (share 0.694956) |
+| Champions | 27,453 buyers, revenue 85,321,183.75 (share 0.371069) |
+| Reconciliation gaps | all within 0.01; buyer gap 0; cart-event gap 0 |
+
+### Decisions
+
+- The session funnel has two parts. The nested path counts sessions that contain a view, then a view and a cart, then all three. The purchase-path rows partition the 629,560 purchase sessions, so the 337,699 sessions that purchase with no cart stay visible.
+- Cart abandonment is one row per `user_session` and `product_id` that was carted. Abandoned means that session has no purchase event for that product. `cart_price` is the maximum cart-event price on the pair. The value column is that price summed over abandoned pairs.
+- Price bands are half-open cuts at 50, 150, 300, 600, and 1,000. The purchase-price quantiles in the same run are p25 87.49, median 179.84, p75 375.21, p90 782.22, and p99 1,639.82.
+- Brand metrics group `fact_events.brand`. Category metrics join `dim_product`.
+- `hour(event_time)` is the UTC hour because the runner sets DuckDB `TimeZone` to UTC before the queries. The epoch check guards that setting.
+- RFM recency is days from the last purchase date to 2019-10-31. Frequency and monetary NTILE scores are published with their observed bounds. Frequency scores 1, 2, and 3 are all one purchase session, so the segment label uses the raw session count.
+- The 7-day average is blank in `revenue_ma7_full` until the window contains seven dates. The first six dates keep a shorter average in `revenue_ma7`.
+
+### Problems
+
+1. **The first full run failed in `q18_reconcile`.** The select referenced `band_tot` and the query never joined that CTE. Added the cross join. The rerun validated.
+2. **`revenue_per_purchase_session` was first printed as `365.230000`.** The formatter treated every column containing `per_` as a rate. Money columns now stay in cents unless the name contains `share`. The results file was regenerated.
