@@ -145,3 +145,66 @@ The daily counts sum to 42,448,764.
 2. **The job took 22.0 seconds, not the expected 5–15 minutes.** Explicit schema, no shuffle, a 12g heap that actually stuck, and the laptop SSD. The row count still matches `wc -l`, so the short runtime is not a partial load.
 3. **Spark still warns** that `MacBook-Pro.local` resolves to loopback and that the native Hadoop library is absent. Same local-mode warnings as Phase 1. The load succeeded.
 4. **DuckDB prints the first timestamp as `2019-10-01 01:00:00+01`** when the session timezone is the machine zone. The epoch is 1,569,888,000, equal to 2019-10-01 00:00:00 UTC. The instant is UTC. Display it in UTC.
+
+## Phase 3 — Data profiling (2026-10-09)
+
+### What was done
+
+- Wrote `src/02_profile.py`. The file was not in the tree. It reads `data/bronze/events` only and overwrites `docs/data_profile.md`.
+- Profiled null rates, the price distribution, the event mix, exact duplicates, category-code depth, brand text, sessions per user, events per session, and sessions that contain a purchase.
+- Cross-checked the headline counts in DuckDB, including the duplicate count. The two engines agree.
+
+### Commands
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+source .venv/bin/activate
+python src/02_profile.py
+```
+
+The run that wrote the committed profile used an 8g driver and `local[6]`. It finished in 44.5 seconds. JVM `maxMemory` was 8,589,934,592 bytes.
+
+### Key numbers
+
+Full tables and the one-line reading of each table are in `docs/data_profile.md`. The figures below are from that run.
+
+| Check | Result |
+| --- | --- |
+| Events | 42,448,764 |
+| Users | 3,022,290 |
+| Sessions | 9,244,421 |
+| Products | 166,794 |
+| view / cart / purchase | 40,779,399 / 926,516 / 742,849 |
+| Null category_code | 13,515,609 (31.84%) |
+| Null brand | 6,113,008 (14.40%) |
+| Null user_id | 0 |
+| Null user_session | 2 |
+| Price min / median / mean / p99 / max | 0.00 / 162.93 / 290.3237 / 1,741.34 / 2,574.07 |
+| Price < 0 | 0 |
+| Price = 0 | 68,673 (view 68,523, cart 150, purchase 0) |
+| Exact-duplicate groups | 18,099 |
+| Extra duplicate rows | 30,220 (0.07% of events) |
+| Distinct source rows | 42,418,544 |
+| Category depth | missing 13,515,609; depth 2: 17,356,435; depth 3: 11,540,478; depth 4: 36,242 |
+| Brands needing lowercase+trim | 0 (3,445 distinct either way) |
+| Median / max sessions per user | 2 / 7,400 |
+| Users with exactly one session | 1,475,463 (48.82%) |
+| Median / p99 / max events per session | 2 / 32 / 1,159 |
+| Sessions with a purchase | 629,560 (6.81% of sessions) |
+| Sessions tied to more than one user_id | 348 |
+
+DuckDB on the same Parquet returned the same row count, null counts, zero-price split, median 162.93, p99 1,741.34, max 2,574.07, user count, session count, and purchase-session count. `count(*) - count(DISTINCT row)` was 30,220 extra rows, the same number Spark reported. DuckDB's `avg(price)` was 290.32366068504956 and Spark's was 290.32366068488096. Both round to 290.3237. The profile publishes the Spark value.
+
+### Decisions
+
+- Duplicates use `GROUP BY` on the nine source columns `HAVING COUNT(*) > 1`. Only the three scalar totals are collected. `event_date` is not part of the key.
+- Median and p99 are Spark's exact `percentile`, which interpolates between adjacent values. On this file the median and p99 landed on observed cent prices, and DuckDB `quantile_cont` returned the same two numbers.
+- A null `user_session` is not treated as a session. Two such rows are excluded from the session tables and counted beside them.
+- Driver memory is 8g, under the 12g cap. The table is about 700 MB of Parquet.
+
+### Problems
+
+1. **`src/02_profile.py` was missing.** Written in this phase.
+2. **Spark warned `RowBasedKeyValueBatch` could not spill** during the duplicate aggregation. The stage still finished. The DuckDB distinct count matches, so the warning did not drop rows. The query was not rewritten.
+3. **The first draft of the report rounded a 2-row null rate to 0.0000%.** The formatter now keeps enough digits. The committed profile shows 0.00000471% for those 2 rows.
