@@ -265,3 +265,65 @@ Fill and flag counts are lower than the Phase 3 null and zero-price totals becau
 1. **`src/03_clean_silver.py` was missing.** Written in this phase.
 2. **Spark again warned that `RowBasedKeyValueBatch` could not spill** during `dropDuplicates`. The stage finished. The post-write duplicate check found 0 extra rows.
 3. **The silver folder is larger than bronze.** Silver is 1,478,063,662 bytes and the bronze folder was 737,707,885 bytes. The clean copy adds three category levels and a flag, and it repeats the literal `unknown` on the missing categories. The row count still went down.
+
+## Phase 5 — Gold star schema (2026-10-09)
+
+### What was done
+
+- Wrote `src/04_build_gold.py`. It reads `data/silver/events`, overwrites `fact_events`, `sessions`, `dim_user`, `dim_product`, and `dim_date` under `data/gold`, and writes `docs/data_model.md` from the counts that run measured.
+- Ran the self-test (modal brand, dominant session user, revenue, weekend flags, and the Monday week boundary), then the full month.
+- Validation read the written Parquet back and checked grains, additive facts, and orphan keys.
+
+### Commands
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+source .venv/bin/activate
+python src/04_build_gold.py --self-test --driver-memory 1g --master local[1]
+python src/04_build_gold.py
+```
+
+The full run used a 12g driver and `local[6]`. `maxMemory` was 12,884,901,888 bytes. The model doc stamps 73.0 seconds because it is written before the Spark session stops. The process logged `GOLD_ELAPSED seconds=73.1`.
+
+### Key numbers
+
+| Check | Result |
+| --- | --- |
+| fact_events | 42,418,542 |
+| Views / carts / purchases | 40,777,328 / 898,441 / 742,773 |
+| Revenue | 229,933,212.63 |
+| sessions | 9,244,421 |
+| dim_user | 3,022,290 |
+| dim_product | 166,794 |
+| dim_date | 31 (2019-10-01 through 2019-10-31, 8 weekend dates) |
+| Products with more than one category tuple | 0 |
+| Products with more than one brand | 7,701, covering 1,724,111 events |
+| Those events that carry the modal brand | 1,612,796 |
+| Purchases on a multi-brand product | 20,096, revenue 6,400,447.26 |
+| Sessions with more than one user_id | 348 |
+| User-session links | 9,244,770 (sum of `dim_user.n_sessions` and of `sessions.n_users`) |
+| Sessions crossing UTC midnight | 29,606 |
+| Sessions with duration 0 | 3,271,152 |
+| Duration range | 0 to 2,640,529 seconds |
+| Orphan keys | 0 on every check |
+| Parquet files | fact 31 (one per `event_date`); sessions 8; dim_user 4; dim_product 1; dim_date 1 |
+| Folder bytes | fact 1,353,311,820; sessions 349,310,794; dim_user 49,150,966; dim_product 944,677; dim_date 2,115; total 1,752,720,372 |
+
+Views, carts, and purchases sum to 42,418,542. Fact revenue and the sum of `sessions.revenue` are both 229,933,212.63. The collected double was 229933212.63000426. The residual is under a tenth of a cent, inside the 0.01 reconciliation tolerance, and both sides formatted to the same cent.
+
+### Decisions
+
+- Category lives only on `dim_product`. The job measured 0 products with more than one category tuple. A non-zero count exits before any gold write.
+- `fact_events.brand` is the brand on that event. `dim_product.brand` is the modal brand, and a tie goes to the smaller brand string. 1,612,796 of the 1,724,111 events on multi-brand products carry that modal brand. Later brand metrics use the fact column.
+- `sessions.user_id` is the user with the most events in the session. A tie goes to the smaller `user_id`. Counts and revenue include the whole session. The fact keeps each event's own `user_id`. The 9,244,770 user-session links are 349 above the session count because 348 sessions contain more than one user.
+- `sessions` is a session-grain fact and is not partitioned by date. 29,606 sessions start and end on different UTC dates.
+- Revenue is purchase `price` where `is_non_positive_price` is false. Views and carts are excluded. `n_purchases` still counts every purchase event, including a flagged non-positive price. Phase 4 found no such purchase, so the purchase count and the revenue-eligible purchase count are the same 742,773 on this file.
+- `dim_date` uses `event_date` so a SQL join does not need the reserved word `date`. `day_of_week` is Monday = 1 through Sunday = 7. `week` is Spark `weekofyear`. The spine is the 31 dates present in silver. 2019-10-01 is Tuesday, week 40. Week 41 starts on Monday 2019-10-07.
+
+### Problems
+
+1. **`src/04_build_gold.py` was missing.** Written in this phase.
+2. **The bronze purchase count was 742,849.** Gold purchases are 742,773. By event type, the Phase 4 row drops are 76 purchases, 28,075 carts, and 2,071 views. Those three drops sum to 30,222, which is the 30,220 duplicate extras plus the 2 null-session rows. The purchase grain is the surviving silver purchase.
+3. **3,271,152 sessions have duration 0, and the longest session lasts 2,640,529 seconds (30.56 days).** A single instant is duration 0. A session may span the month. Both were left as measured.
+4. **No spill warning on this run.** The hostname and missing native-Hadoop messages are the same local-mode warnings as earlier phases. Validation counts matched, so they were left as-is.
