@@ -383,3 +383,62 @@ DuckDB is v1.5.6. The successful analysis run logged `ANALYSIS_ELAPSED seconds=9
 
 1. **The first full run failed in `q18_reconcile`.** The select referenced `band_tot` and the query never joined that CTE. Added the cross join. The rerun validated.
 2. **`revenue_per_purchase_session` was first printed as `365.230000`.** The formatter treated every column containing `per_` as a rate. Money columns now stay in cents unless the name contains `share`. The results file was regenerated.
+
+## Phase 7 — Dashboard extracts and Streamlit app (2026-10-09)
+
+### What was done
+
+- Narrowed `.gitignore` from `data/` to `/data/`. The unanchored rule also ignored `dashboard/data`, which is the only data directory this project commits.
+- Wrote `src/06_export_dashboard_data.py`. DuckDB reads the gold tables with `TimeZone` set to UTC, reuses the analysis macros, and overwrites 11 zstd Parquet files in `dashboard/data`.
+- Wrote `dashboard/metrics.py` and `dashboard/app.py`. The app is Streamlit and Plotly, with Overview, Products, and Customers and timing. Filters are the UTC date range, category, and event type. `@st.cache_data` loads the extracts from a path next to the app file.
+- `dashboard/requirements.txt` pins streamlit 1.65.0, plotly 7.1.0, pandas 3.0.6, and pyarrow 25.0.1.
+
+### Commands
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+source .venv/bin/activate
+python -m py_compile src/06_export_dashboard_data.py
+python src/06_export_dashboard_data.py
+python -m py_compile dashboard/app.py dashboard/metrics.py
+python /tmp/phase7_smoke.py
+streamlit run dashboard/app.py --server.headless true --server.port 8765 --server.address 127.0.0.1
+```
+
+The smoke script is a local check, not a project file. It calls the filter functions and Streamlit `AppTest`. The headless server was stopped after the health check.
+
+### Key numbers
+
+| Check | Result |
+| --- | --- |
+| Export validation | `DASHBOARD_VALIDATED revenue=229933212.63 purchases=742773 users=3022290` |
+| Export elapsed | `EXPORT_ELAPSED seconds=18.4` |
+| Extract bytes | 353,617 (cap 50,000,000) |
+| Extract rows | daily_category 434, daily_totals 31, month_category 14, month_totals 1, category_l2 1,856, brands 5,530, hourly 24,231, price_bands 1,836, abandonment 1,502, rfm_segments 7, rfm_score_bounds 15 |
+| Full-month cards | revenue 229,933,212.63, orders 742,773, conversion 1.8215%, AOV 309.56, active users 3,022,290 |
+| 2019-10-16 | revenue 9,747,164.72, active users 230,199 |
+| electronics, full month | revenue 176,445,577.86, orders 422,979, active users 1,683,503 |
+| 2019-10-01 through 2019-10-03 | label `Avg daily active users`, value 181,940.3 |
+| Brand rollup for All | revenue sums to 229,933,212.63; apple is 111,199,495.70 |
+| Abandonment, full month | 323,267 abandoned of 628,207 pairs, value 107,866,053.25 |
+| RFM buyers | 347,118, unchanged after a date filter |
+| Purchase heatmap, full month | 742,773 events; busiest cell Wednesday 09:00 UTC with 9,106 events |
+| All-events heatmap, 2019-10-02 through 2019-10-04 | 3,733,416 events; busiest cell Friday 16:00 UTC with 98,613 events |
+| Headless server | `GET /_stcore/health` returned ok, `GET /` returned 200. Log had no traceback. |
+
+### Decisions
+
+- Distinct users are exact for the full month and for a single day. Those rows come from `month_totals`, `month_category`, or that day's extract. A multi-day slice shows the average of the daily distinct counts. Revenue, views, carts, and purchases are summed, and conversion and AOV are recomputed from the sums.
+- The event funnel on the page counts events. The session path (9,242,653 view sessions, 337,699 purchase sessions with no cart) is a caption, and only when the filter is the full month and All. A session can cross midnight, so the app does not add daily session counts.
+- Event type filters the heatmap. It does not change revenue, orders, conversion, AOV, or the funnel. The purchase-event heatmap still showed 742,773 events after that filter, and the overview cards stayed at the full-month revenue and orders.
+- RFM was fit on every October buyer. Date and category filters do not recompute it. Frequency scores 1, 2, and 3 are one purchase session each, so the caption says the segment uses the raw session count.
+- Brand `All` is a pre-aggregated rollup. The app filters to that rollup. Adding it to the category rows would double revenue. `other` is the long tail after the top 12 brands and unknown.
+- The 7-day revenue average uses a full window of seven selected dates. The first six dates in the selection are blank.
+- Chart colors match the notebook: blue for known categories and brands, orange for unknown and weekend days, green for revenue, red for abandonment, purple for the 7-day average, teal for the second category level. Plotly is drawn with `theme=None` so the Streamlit chart theme does not replace that palette.
+
+### Problems
+
+1. **`data/` in `.gitignore` ignored `dashboard/data`.** `git check-ignore -v` pointed at that rule for a file under `dashboard/data`. The rule is now `/data/`. A later check ignores `data/gold` and does not ignore `dashboard/data/month_totals.parquet`.
+2. **No browser was available in this session.** Widget behavior was checked with `AppTest`: page changes, the electronics category, 2019-10-16, a three-day range, and the event-type filter. The headless server booted and answered on port 8765. The first HTML response is the Streamlit shell, so the KPI text is not in that response. A real browser pass of the rendered page was not run.
+3. **Streamlit suggested installing Watchdog.** The server still started and the health check passed. Watchdog is not required to run the app.
