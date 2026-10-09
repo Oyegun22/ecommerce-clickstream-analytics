@@ -208,3 +208,60 @@ DuckDB on the same Parquet returned the same row count, null counts, zero-price 
 1. **`src/02_profile.py` was missing.** Written in this phase.
 2. **Spark warned `RowBasedKeyValueBatch` could not spill** during the duplicate aggregation. The stage still finished. The DuckDB distinct count matches, so the warning did not drop rows. The query was not rewritten.
 3. **The first draft of the report rounded a 2-row null rate to 0.0000%.** The formatter now keeps enough digits. The committed profile shows 0.00000471% for those 2 rows.
+
+## Phase 4 — Silver cleaning (2026-10-09)
+
+### What was done
+
+- Wrote `src/03_clean_silver.py`. One function per cleaning rule. The script overwrites `data/silver/events`, partitioned by `event_date`, and writes `docs/cleaning_log.md` from the counts it just measured.
+- Ran a tiny self-test of the split, the price flag, the brand standardisation, and the duplicate order, then ran the full month.
+- DuckDB read the silver Parquet back and matched the Spark checks.
+
+### Commands
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$PATH"
+source .venv/bin/activate
+python src/03_clean_silver.py --self-test --driver-memory 1g --master local[1]
+python src/03_clean_silver.py
+```
+
+The full run used a 12g driver and `local[6]`. `maxMemory` was 12,884,901,888 bytes. The process logged `SILVER_ELAPSED seconds=98.1`. The cleaning log stamps 97.7 seconds because it is written before the Spark session stops.
+
+### Key numbers
+
+| Check | Result |
+| --- | --- |
+| Bronze rows | 42,448,764 |
+| Brand values changed by lower/trim | 0 |
+| Exact duplicate rows removed | 30,220 |
+| Rows after the duplicate drop | 42,418,544 |
+| Null user_id or user_session rows removed | 2 |
+| Silver rows | 42,418,542 |
+| Zero prices flagged and kept | 68,670 (view 68,521, cart 149, purchase 0) |
+| Negative prices | 0 |
+| Brands filled with `unknown` | 6,112,126 |
+| Category codes filled with `unknown` | 13,512,262 |
+| Rows whose category was not already three levels | 30,884,455 |
+| Depth-4 code `electronics.audio.music_tools.piano` | 36,224, all stored as electronics / audio / music_tools.piano |
+| Date partitions | 31 (2019-10-01 through 2019-10-31) |
+| Parquet files | 31 |
+| Silver folder size | 1,478,063,662 bytes |
+| Extra duplicate rows after the fills | 0 |
+
+Fill and flag counts are lower than the Phase 3 null and zero-price totals because they are taken after the duplicate drop and the two-row key drop. DuckDB on `data/silver/events` returned 42,418,542 rows, 68,670 flagged prices, 36,224 correct piano splits, 13,512,262 fully unknown category rows, and no null brand, category, level, user, or session.
+
+### Decisions
+
+- Price `<= 0` is flagged, not dropped. After the row drops, the 68,670 zeros are 68,521 views and 149 carts. None are purchases and none are negative. Deleting them would shrink the funnel. `is_non_positive_price` lets revenue queries skip them. The stored price is still 0.
+- Null brand and null `category_code` are filled with `unknown`. No row is dropped for a missing attribute. Neither column already contained the literal `unknown` (0 rows), so the fill does not collide with a real value.
+- Category level 3 keeps the tail of a code with four or more pieces. The only such code is `electronics.audio.music_tools.piano`, and all 36,224 surviving rows landed on `music_tools.piano`.
+- Brand lower/trim removed nothing on this file. It still runs first, so a later month with mixed case is deduplicated after the case fold.
+- A null `user_session` is dropped, not filled. Two rows were removed. Filling them with `unknown` would invent a session.
+
+### Problems
+
+1. **`src/03_clean_silver.py` was missing.** Written in this phase.
+2. **Spark again warned that `RowBasedKeyValueBatch` could not spill** during `dropDuplicates`. The stage finished. The post-write duplicate check found 0 extra rows.
+3. **The silver folder is larger than bronze.** Silver is 1,478,063,662 bytes and the bronze folder was 737,707,885 bytes. The clean copy adds three category levels and a flag, and it repeats the literal `unknown` on the missing categories. The row count still went down.
