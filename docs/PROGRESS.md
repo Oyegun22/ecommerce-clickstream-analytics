@@ -488,3 +488,36 @@ The regenerated docs changed their run stamps and elapsed times. The analysis re
 
 1. **Profile and silver again logged `RowBasedKeyValueBatch.spill()` returning 0.** The same warning appeared in the earlier profile and silver runs. Both steps still logged their expected row counts, and gold validation passed.
 2. **The export rewrote the Parquet extracts at 354,128 bytes.** The previous export was 353,617 bytes. Revenue, purchases, users, and the apple brand total match the published figures. The size change is the Parquet writer, and the new files replace the previous extracts.
+
+## Phase 9 — Showcase content (2026-10-09)
+
+### What was done
+
+- Wrote `docs/linkedin_post.md`: one main post, two shorter variants, hashtags, and a three-bullet LinkedIn Projects entry. The GitHub user and the Streamlit URL are placeholders.
+- Wrote `docs/hiring_critique.md`: five portfolio weaknesses and a concrete fix for each.
+- No pipeline job was rerun. Every figure in the new docs is taken from `docs/key_findings.md`, `docs/analysis_results.md`, or the Phase 8 `make all` log.
+
+### Commands
+
+```bash
+git ls-files
+```
+
+### Key numbers used in the posts
+
+| Figure | Value |
+| --- | --- |
+| Raw events | 42,448,764 |
+| Gold fact rows | 42,418,542 |
+| Revenue / purchases / AOV | 229,933,212.63 / 742,773 / 309.56 |
+| Purchase sessions with no cart | 337,699 of 629,560 (rate 0.536405) |
+| electronics / smartphone | 157,033,913.97 (share 0.682954) |
+| Apple / Samsung revenue | 111,199,495.70 / 46,402,037.35 |
+| Repeat buyers | 111,657 buyers, revenue 159,793,398.94 (share 0.694956) |
+| Dashboard extracts | 354,128 bytes |
+
+### Decisions
+
+- The posts stay in the first person so they can be pasted onto a profile.
+- The critique is a separate file so the post file stays free of review notes.
+- Nothing was pushed. The remote, the live app, and the screenshots are manual steps recorded in the Phase 9 report.
