@@ -2,6 +2,26 @@
 
 The October 2019 REES46 event file records every view, cart, and purchase on one storefront, but the raw log does not say which categories, brands, or buyers produce the revenue. This project lands that file in a medallion warehouse, measures the funnel, the catalog, cart abandonment, and a one-month RFM split with definitions that stay stable from SQL to the dashboard, and publishes a small Streamlit app so those cuts can be filtered without scanning the full event table.
 
+## Data source
+
+The events come from **eCommerce behavior data from multi category store**, published by Michael Kechinov and collected through the [REES46](https://rees46.com) Open CDP. This repository uses the October 2019 file only.
+
+| | |
+| --- | --- |
+| Dataset page | [kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store) |
+| REES46 catalog | [rees46.com/en/datasets](https://rees46.com/en/datasets) |
+| October 2019 file | [2019-Oct.csv.gz](https://data.rees46.com/datasets/marketplace/2019-Oct.csv.gz) |
+
+The download link returned `content-length` 1,741,928,540 bytes on 2026-10-13. Uncompressed, `2019-Oct.csv` is 5,668,612,855 bytes. The publisher asks anyone who reuses the file to mention that dataset page and [rees46.com](https://rees46.com).
+
+```bash
+mkdir -p data/raw
+curl -L -o data/raw/2019-Oct.csv.gz https://data.rees46.com/datasets/marketplace/2019-Oct.csv.gz
+gunzip -f data/raw/2019-Oct.csv.gz
+```
+
+The raw file stays on disk under `data/raw/` and is left out of git. The committed dashboard extracts are aggregates of this file.
+
 ## Architecture
 
 Bronze is the typed CSV as Parquet. Silver applies the cleaning rules. Gold is the star schema DuckDB and the dashboard both read. The app reads the extracts in `dashboard/data`.
@@ -84,7 +104,7 @@ make all
 streamlit run dashboard/app.py
 ```
 
-`make all` runs the steps below in order. `data/raw/2019-Oct.csv` must already be present. The scripts overwrite their outputs and do not modify the raw file.
+`make all` runs the steps below in order. Download `2019-Oct.csv` with the commands in [Data source](#data-source) first. The scripts overwrite their outputs and leave the raw file unchanged.
 
 | Target | Script | Output |
 | --- | --- | --- |

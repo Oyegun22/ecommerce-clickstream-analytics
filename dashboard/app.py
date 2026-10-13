@@ -718,6 +718,12 @@ def main() -> None:
     page, start, end, category, event_type = sidebar(tables, first, last)
 
     st.title("October 2019 clickstream")
+    st.markdown(
+        "Source: Michael Kechinov, "
+        "[eCommerce behavior data from multi category store](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store). "
+        "October 2019 file: [2019-Oct.csv.gz](https://data.rees46.com/datasets/marketplace/2019-Oct.csv.gz) "
+        "from [REES46](https://rees46.com)."
+    )
     if start == end:
         window = start.isoformat()
     else:

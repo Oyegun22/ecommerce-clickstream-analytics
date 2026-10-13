@@ -8,7 +8,7 @@ Replace `YOUR_USER` and `YOUR_STREAMLIT_APP_URL` before posting.
 
 337,699 purchase sessions never touched the cart.
 
-I modeled the public REES46 October 2019 clickstream so I could say where the revenue sits, and which funnel would miss it. The raw file has 42,448,764 events. The gold fact keeps 42,418,542 after exact-duplicate and null-session removal, and positive-price purchases sum to 229,933,212.63.
+I modeled the public REES46 October 2019 clickstream so I could say where the revenue sits, and which funnel would miss it. The file is Michael Kechinov’s [eCommerce behavior data from multi category store](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store), and the October archive is [2019-Oct.csv.gz](https://data.rees46.com/datasets/marketplace/2019-Oct.csv.gz). The raw file has 42,448,764 events. The gold fact keeps 42,418,542 after exact-duplicate and null-session removal, and positive-price purchases sum to 229,933,212.63.
 
 The warehouse is bronze Parquet, a cleaned silver table, and a gold star schema. DuckDB runs the metric SQL on the gold files. The Streamlit app reads 354,128 bytes of aggregates.
 

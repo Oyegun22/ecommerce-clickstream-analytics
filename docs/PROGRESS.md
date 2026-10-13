@@ -521,3 +521,13 @@ git ls-files
 - The posts stay in the first person so they can be pasted onto a profile.
 - The critique is a separate file so the post file stays free of review notes.
 - Nothing was pushed. The remote, the live app, and the screenshots are manual steps recorded in the Phase 9 report.
+
+## Data source link (2026-10-13)
+
+The October file is the public REES46 multi-category dataset published by Michael Kechinov.
+
+- Dataset page: https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store
+- Catalog: https://rees46.com/en/datasets
+- Direct file: https://data.rees46.com/datasets/marketplace/2019-Oct.csv.gz
+
+`curl -sI` on 2026-10-13 returned HTTP 200 and `content-length` 1,741,928,540 for that gzip. The uncompressed CSV already in this workspace is 5,668,612,855 bytes. The publisher asks for a mention of the dataset page and https://rees46.com. The README, project brief, dashboard, and LinkedIn post now carry those links. The raw file stays out of git.

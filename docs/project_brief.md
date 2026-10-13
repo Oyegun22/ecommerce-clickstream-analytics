@@ -8,7 +8,9 @@ Where does October revenue come from, which sessions buy without a cart, which c
 
 ## Data
 
-`data/raw/2019-Oct.csv` has the columns `event_time`, `event_type`, `product_id`, `category_id`, `category_code`, `brand`, `price`, `user_id`, and `user_session`. `event_type` is `view`, `cart`, or `purchase`. The raw file is 5,668,612,855 bytes. It stays out of git. The only committed data is the dashboard extracts under `dashboard/data`.
+The source is Michael Kechinov’s public dataset, [eCommerce behavior data from multi category store](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store), collected through [REES46](https://rees46.com). The October file is [2019-Oct.csv.gz](https://data.rees46.com/datasets/marketplace/2019-Oct.csv.gz). The catalog entry is on the [REES46 datasets page](https://rees46.com/en/datasets).
+
+`data/raw/2019-Oct.csv` has the columns `event_time`, `event_type`, `product_id`, `category_id`, `category_code`, `brand`, `price`, `user_id`, and `user_session`. `event_type` is `view`, `cart`, or `purchase`. The uncompressed file is 5,668,612,855 bytes. The gzip archive measured 1,741,928,540 bytes on 2026-10-13. The raw file stays out of git. The only committed data is the dashboard extracts under `dashboard/data`.
 
 ## Metric definitions
 
