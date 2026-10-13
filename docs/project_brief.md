@@ -27,4 +27,4 @@ Numbered scripts in `src/` land bronze, profile it, clean silver, build the gold
 
 The model covers 2019-10-01 through 2019-10-31. Recency is position inside that month. Sessions that contain more than one `user_id` keep a single dominant user on the session row, and the fact keeps each event's own user. Spark runs locally with a driver heap of at most 12g.
 
-The copyright line in `LICENSE` uses the local author name recorded on the commits in this workspace. Replace that name before a public release.
+The copyright line in `LICENSE` and the Git author are Oyegun22. The public repository is `https://github.com/Oyegun22/ecommerce-clickstream-analytics`.

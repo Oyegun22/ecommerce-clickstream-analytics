@@ -482,7 +482,7 @@ The regenerated docs changed their run stamps and elapsed times. The analysis re
 - `make clean` is the silver cleaning script. The target list is `setup`, `ingest`, `profile`, `clean`, `gold`, `analyze`, `dashboard`, and `all`.
 - `make dashboard` writes the extracts and returns. Launching Streamlit stays a separate command so `make all` can finish.
 - The README dashboard link and the three screenshot paths are placeholders for the deploy step.
-- The license copyright uses the local author name `Apple`, the same name as the commits in this workspace.
+- The license copyright was first the local author name `Apple`. A later rewrite sets the Git author and the copyright line to Oyegun22.
 
 ### Problems
 

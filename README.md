@@ -104,7 +104,7 @@ jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb --Execut
 
 A Streamlit Cloud deploy should install `dashboard/requirements.txt` and start `dashboard/app.py`. The extracts in `dashboard/data` are the data that deploy needs.
 
-The local commits in this workspace use a placeholder Git author. Set your name and email before the first push.
+The repository is [github.com/Oyegun22/ecommerce-clickstream-analytics](https://github.com/Oyegun22/ecommerce-clickstream-analytics).
 
 ## Future improvements
 
